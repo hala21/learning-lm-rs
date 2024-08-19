@@ -71,7 +71,31 @@ pub fn masked_softmax(y: &mut Tensor<f32>) {
 }
 
 pub fn rms_norm(y: &mut Tensor<f32>, x: &Tensor<f32>, w: &Tensor<f32>, epsilon: f32) {
-    todo!("实现 rms_norm，计算前做一些必要的检查会帮助你后续调试")
+    // todo!("实现 rms_norm，计算前做一些必要的检查会帮助你后续调试")
+    assert!(x.shape() == y.shape());
+    assert!(w.size() == y.shape()[1]);
+
+    let _y = unsafe { y.data_mut() };
+    let _x = x.data();
+    let _w = w.data();
+    
+    // 计算归一化
+    let chunk_size = w.size(); // w的size就是tensor一行的数据
+    // 一行一行的读取数据然后进行计算
+    let y_normal = _x.chunks_exact(chunk_size).map(|x_i| {
+        let squ_sum = x_i.iter().map(|xij| xij*xij).sum::<f32>();
+        let fenmu = (squ_sum/x_i.len() as f32 + epsilon).sqrt();
+        x_i.iter().zip(_w.iter()).map(|(&x,&w)|x*w).map(move |fz| fz/fenmu )
+    });
+
+    // Y Tensor 归一化
+    _y.chunks_exact_mut(chunk_size).zip(y_normal).for_each(|(yi,yn)|
+    {
+        yi.iter_mut().zip(yn).for_each(|(i,n)|*i=n);
+
+    });
+
+
 }
 
 // y = sigmoid(x) * x * y
@@ -83,7 +107,18 @@ pub fn silu(y: &mut Tensor<f32>, x: &Tensor<f32>) {
     // let _y = unsafe { y.data_mut() };
     // let _x = x.data();
 
-    todo!("实现 silu，这里给了一些前期准备工作的提示，你可以参考")
+    // todo!("实现 silu，这里给了一些前期准备工作的提示，你可以参考");
+    let len = y.size();    
+    assert!(len == x.size());
+    let x = x.data();
+    let y = unsafe {
+        y.data_mut()
+    };
+    let sigx = x.iter().map(|x| x / (1. + (-x).exp() )) ;
+    y.iter_mut().zip(sigx).for_each(
+        |(y_t,x_t)| *y_t*=x_t
+    );
+
 }
 
 // C = beta * C + alpha * A @ B^T
